@@ -5,13 +5,178 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/comfforts/logger"
 	"github.com/stretchr/testify/require"
+
+	"github.com/comfforts/localstorage/pkg/models"
 )
 
-const TEST_DIR = "test-data"
+const TEST_DIR = "data"
+
+func TestReadJSONFile(t *testing.T) {
+	name := "data"
+	fPath, err := createJSONFile(TEST_DIR, name)
+	require.NoError(t, err)
+
+	logger := logger.NewTestAppLogger(TEST_DIR)
+	lsc, err := NewLocalStorageClient(logger)
+	require.NoError(t, err)
+
+	resCh := make(chan JSONMapper)
+	errCh := make(chan error)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err = lsc.ReadJSONFile(ctx, cancel, fPath, resCh, errCh)
+	require.NoError(t, err)
+
+	errs := map[string]int{}
+	resCount := 0
+	for {
+		select {
+		case <-ctx.Done():
+			require.Equal(t, resCount, 3)
+			require.Equal(t, len(errs), 0)
+			return
+		case r, ok := <-resCh:
+			if !ok {
+				require.Equal(t, resCount, 3)
+				require.Equal(t, len(errs), 0)
+				return
+			} else {
+				if r != nil {
+					t.Logf("TestReadJSONFile: result: %v\n", r)
+					resCount++
+				}
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				require.Equal(t, resCount, 3)
+				require.Equal(t, len(errs), 0)
+				return
+			} else {
+				if err != nil {
+					t.Logf("TestReadJSONFile - error: %v\n", err)
+					errs[err.Error()]++
+				}
+			}
+		}
+	}
+}
+
+func TestReadCSVFile(t *testing.T) {
+	fPath := filepath.Join(TEST_DIR, "Principals.csv")
+	// fPath := filepath.Join(TEST_DIR, "Agents.csv")
+
+	logger := logger.NewTestAppLogger(TEST_DIR)
+	lsc, err := NewLocalStorageClient(logger)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	resCh := make(chan []string)
+	errCh := make(chan error)
+
+	err = lsc.ReadCSVFile(ctx, cancel, fPath, resCh, errCh)
+	require.NoError(t, err)
+
+	errs := map[string]int{}
+	res := map[int]*models.Entity{}
+	for {
+		select {
+		case <-ctx.Done():
+			t.Logf("TestReadCSVFile: context done, returning. resCount: %d, errCnt: %v\n", len(res), errs)
+			return
+		case r, ok := <-resCh:
+			if !ok {
+				t.Logf("TestReadCSVFile: resultstream closed, returning. resCount: %d, errCnt: %v\n", len(res), errs)
+				return
+			} else {
+				if r != nil {
+					entity := models.MapToEntity(res, r)
+					t.Logf("TestReadCSVFile: entity: %v\n", entity)
+				}
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				t.Logf("TestReadCSVFile: error stream closed, returning resCount: %d, errCnt: %v\n", len(res), errs)
+				return
+			} else {
+				if err != nil {
+					t.Logf("TestReadCSVFile, error: %v\n", err)
+					errs[err.Error()]++
+				}
+			}
+		}
+	}
+
+}
+
+func TestReadFilingsCSVFile(t *testing.T) {
+	fPath := filepath.Join(TEST_DIR, "Filings.csv")
+
+	logger := logger.NewTestAppLogger(TEST_DIR)
+	lsc, err := NewLocalStorageClient(logger)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	resCh := make(chan []string)
+	errCh := make(chan error)
+
+	err = lsc.ReadCSVFile(ctx, cancel, fPath, resCh, errCh)
+	require.NoError(t, err)
+
+	errs := map[string]int{}
+	res := map[int][]*models.Entity{}
+	var resCount int
+	for {
+		select {
+		case <-ctx.Done():
+			t.Logf("TestReadFilingsCSVFile: context done, returning. recordCount: %d, resCount: %d, errCnt: %v\n", resCount, len(res), errs)
+			return
+		case r, ok := <-resCh:
+			if !ok {
+				t.Logf("TestReadFilingsCSVFile: resultstream closed, returning. resCount: %d, resCount: %d, errCnt: %v\n", resCount, len(res), errs)
+				return
+			} else {
+				if r != nil {
+					entity, entErrs := models.MapRecordToEntity(r)
+					if entErrs != nil && len(entErrs) > 0 {
+						for _, err := range entErrs {
+							t.Logf("TestReadFilingsCSVFile, maping error: %v\n", err)
+							errs[err.Error()]++
+						}
+					}
+					t.Logf("TestReadFilingsCSVFile: entity: %v\n", entity)
+					_, ok := res[entity.ID]
+					if ok {
+						res[entity.ID] = append(res[entity.ID], entity)
+					} else {
+						res[entity.ID] = []*models.Entity{entity}
+					}
+					resCount++
+				}
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				t.Logf("TestReadFilingsCSVFile: error stream closed, returning resCount: %d, resCount: %d, errCnt: %v\n", resCount, len(res), errs)
+				return
+			} else {
+				if err != nil {
+					t.Logf("TestReadFilingsCSVFile, error: %v\n", err)
+					errs[err.Error()]++
+				}
+			}
+		}
+	}
+}
 
 func TestLocalFileStorage(t *testing.T) {
 	for scenario, fn := range map[string]func(
@@ -172,6 +337,12 @@ func createJSONFile(dir, name string) (string, error) {
 	if dir != "" {
 		fPath = fmt.Sprintf("%s/%s", dir, fPath)
 	}
+
+	err := os.MkdirAll(filepath.Dir(fPath), os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
 	items := createStoreJSONList()
 
 	f, err := os.Create(fPath)
