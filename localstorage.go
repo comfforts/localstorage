@@ -11,6 +11,9 @@ import (
 
 	"github.com/comfforts/errors"
 	"github.com/comfforts/logger"
+
+	csvFiler "github.com/comfforts/localstorage/pkg/csv"
+	jsonFiler "github.com/comfforts/localstorage/pkg/json"
 )
 
 const DEFAULT_BUFFER_SIZE = 1000
@@ -27,6 +30,8 @@ type WriteResponse struct {
 }
 
 type LocalStorage interface {
+	ReadJSONFile(ctx context.Context, cancel func(), filePath string, resCh chan JSONMapper, errCh chan error) error
+	ReadCSVFile(ctx context.Context, cancel func(), filePath string, resCh chan []string, errCh chan error) error
 	ReadFileArray(ctx context.Context, cancel func(), filePath string) (<-chan ReadResponse, error)
 	WriteFile(ctx context.Context, cancel func(), fileName string, reqStream chan JSONMapper) <-chan WriteResponse
 	Copy(srcPath, destPath string) (int64, error)
@@ -46,6 +51,36 @@ func NewLocalStorageClient(logger logger.AppLogger) (*localStorageClient, error)
 	}
 
 	return loaderClient, nil
+}
+
+func (lc *localStorageClient) ReadJSONFile(ctx context.Context, cancel func(), filePath string, resCh chan JSONMapper, errCh chan error) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+
+	jsonFile, err := jsonFiler.NewJSONFiler(file, lc.logger)
+	if err != nil {
+		return err
+	}
+
+	go jsonFile.ReadJSONFile(ctx, cancel, resCh, errCh)
+	return nil
+}
+
+func (lc *localStorageClient) ReadCSVFile(ctx context.Context, cancel func(), filePath string, resCh chan []string, errCh chan error) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+
+	csvFile, err := csvFiler.NewCSVFiler(file, lc.logger)
+	if err != nil {
+		return err
+	}
+
+	go csvFile.ReadCSVFile(ctx, cancel, resCh, errCh)
+	return nil
 }
 
 // ReadFileArray reads an array of json data from existing file, one by one,
