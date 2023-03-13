@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sync"
 
 	"github.com/comfforts/errors"
 	"github.com/comfforts/logger"
@@ -29,7 +28,6 @@ var (
 type jsonFiler struct {
 	*os.File
 	reader *bufio.Reader
-	mu     sync.Mutex
 	size   uint64
 	logger logger.AppLogger
 }
@@ -51,7 +49,7 @@ func NewJSONFiler(f *os.File, logger logger.AppLogger) (*jsonFiler, error) {
 	}, nil
 }
 
-func (f *jsonFiler) ReadJSONFile(ctx context.Context, cancFn context.CancelFunc, resCh chan models.JSONMapper, errCh chan error) {
+func (f *jsonFiler) ReadJSONFile(ctx context.Context, resCh chan models.JSONMapper, errCh chan error) {
 	dec := json.NewDecoder(f.reader)
 
 	// read open bracket
@@ -60,7 +58,6 @@ func (f *jsonFiler) ReadJSONFile(ctx context.Context, cancFn context.CancelFunc,
 		errCh <- ErrStartToken
 		close(resCh)
 		close(errCh)
-		cancFn()
 		return
 	}
 
@@ -86,7 +83,6 @@ func (f *jsonFiler) ReadJSONFile(ctx context.Context, cancFn context.CancelFunc,
 
 	close(resCh)
 	close(errCh)
-	cancFn()
 }
 
 func (f *jsonFiler) Close() error {

@@ -30,7 +30,7 @@ func TestPrincipals(t *testing.T) {
 	resCh := make(chan []string)
 	errCh := make(chan error)
 
-	go csvFiler.ReadCSVFile(ctx, cancel, resCh, errCh)
+	go csvFiler.ReadCSVFile(ctx, resCh, errCh)
 
 	errs := map[string]int{}
 	res := map[int]*models.Entity{}
@@ -78,7 +78,7 @@ func TestAgents(t *testing.T) {
 	resCh := make(chan []string)
 	errCh := make(chan error)
 
-	go csvFiler.ReadCSVFile(ctx, cancel, resCh, errCh)
+	go csvFiler.ReadCSVFile(ctx, resCh, errCh)
 
 	errs := map[string]int{}
 	res := map[int]*models.Entity{}
@@ -126,7 +126,7 @@ func TestFilings(t *testing.T) {
 	resCh := make(chan []string)
 	errCh := make(chan error)
 
-	go csvFiler.ReadCSVFile(ctx, cancel, resCh, errCh)
+	go csvFiler.ReadCSVFile(ctx, resCh, errCh)
 
 	errs := map[string]int{}
 	res := map[int][]*models.Entity{}
@@ -143,7 +143,7 @@ func TestFilings(t *testing.T) {
 			} else {
 				if r != nil {
 					entity, entErrs := models.MapRecordToEntity(r)
-					if entErrs != nil && len(entErrs) > 0 {
+					if len(entErrs) > 0 {
 						for _, err := range entErrs {
 							fmt.Printf("	TestFilings, maping error: %v\n", err)
 							errs[err.Error()]++

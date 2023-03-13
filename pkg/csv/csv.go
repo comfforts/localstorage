@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"io"
 	"os"
-	"sync"
 
 	"github.com/comfforts/errors"
 	"github.com/comfforts/logger"
@@ -19,7 +18,6 @@ const (
 type csvFiler struct {
 	*os.File
 	reader *csv.Reader
-	mu     sync.Mutex
 	size   uint64
 	logger logger.AppLogger
 }
@@ -43,7 +41,7 @@ func NewCSVFiler(f *os.File, logger logger.AppLogger) (*csvFiler, error) {
 	}, nil
 }
 
-func (f *csvFiler) ReadCSVFile(ctx context.Context, cancFn context.CancelFunc, resCh chan []string, errCh chan error) {
+func (f *csvFiler) ReadCSVFile(ctx context.Context, resCh chan []string, errCh chan error) {
 	f.logger.Info("csv file header", zap.Any("offset", f.reader.InputOffset()))
 	header, err := f.reader.Read()
 	if err != nil {
@@ -60,7 +58,6 @@ func (f *csvFiler) ReadCSVFile(ctx context.Context, cancFn context.CancelFunc, r
 			errCh <- errors.WrapError(err, "end of csv file")
 			close(resCh)
 			close(errCh)
-			cancFn()
 			return
 		} else if err != nil {
 			f.logger.Error("error reading csv file", zap.Error(err), zap.Any("offset", f.reader.InputOffset()))
