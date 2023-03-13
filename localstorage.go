@@ -30,8 +30,8 @@ type WriteResponse struct {
 }
 
 type LocalStorage interface {
-	ReadJSONFile(ctx context.Context, cancel func(), filePath string, resCh chan JSONMapper, errCh chan error) error
-	ReadCSVFile(ctx context.Context, cancel func(), filePath string, resCh chan []string, errCh chan error) error
+	ReadJSONFile(ctx context.Context, filePath string, resCh chan JSONMapper, errCh chan error) error
+	ReadCSVFile(ctx context.Context, filePath string, resCh chan []string, errCh chan error) error
 	ReadFileArray(ctx context.Context, cancel func(), filePath string) (<-chan ReadResponse, error)
 	WriteFile(ctx context.Context, cancel func(), fileName string, reqStream chan JSONMapper) <-chan WriteResponse
 	Copy(srcPath, destPath string) (int64, error)
@@ -53,7 +53,7 @@ func NewLocalStorageClient(logger logger.AppLogger) (*localStorageClient, error)
 	return loaderClient, nil
 }
 
-func (lc *localStorageClient) ReadJSONFile(ctx context.Context, cancel func(), filePath string, resCh chan JSONMapper, errCh chan error) error {
+func (lc *localStorageClient) ReadJSONFile(ctx context.Context, filePath string, resCh chan JSONMapper, errCh chan error) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -64,11 +64,11 @@ func (lc *localStorageClient) ReadJSONFile(ctx context.Context, cancel func(), f
 		return err
 	}
 
-	go jsonFile.ReadJSONFile(ctx, cancel, resCh, errCh)
+	go jsonFile.ReadJSONFile(ctx, resCh, errCh)
 	return nil
 }
 
-func (lc *localStorageClient) ReadCSVFile(ctx context.Context, cancel func(), filePath string, resCh chan []string, errCh chan error) error {
+func (lc *localStorageClient) ReadCSVFile(ctx context.Context, filePath string, resCh chan []string, errCh chan error) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func (lc *localStorageClient) ReadCSVFile(ctx context.Context, cancel func(), fi
 		return err
 	}
 
-	go csvFile.ReadCSVFile(ctx, cancel, resCh, errCh)
+	go csvFile.ReadCSVFile(ctx, resCh, errCh)
 	return nil
 }
 

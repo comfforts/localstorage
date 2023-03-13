@@ -31,7 +31,7 @@ func TestReadJSONFile(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err = lsc.ReadJSONFile(ctx, cancel, fPath, resCh, errCh)
+	err = lsc.ReadJSONFile(ctx, fPath, resCh, errCh)
 	require.NoError(t, err)
 
 	errs := map[string]int{}
@@ -82,7 +82,7 @@ func TestReadCSVFile(t *testing.T) {
 	resCh := make(chan []string)
 	errCh := make(chan error)
 
-	err = lsc.ReadCSVFile(ctx, cancel, fPath, resCh, errCh)
+	err = lsc.ReadCSVFile(ctx, fPath, resCh, errCh)
 	require.NoError(t, err)
 
 	errs := map[string]int{}
@@ -130,7 +130,7 @@ func TestReadFilingsCSVFile(t *testing.T) {
 	resCh := make(chan []string)
 	errCh := make(chan error)
 
-	err = lsc.ReadCSVFile(ctx, cancel, fPath, resCh, errCh)
+	err = lsc.ReadCSVFile(ctx, fPath, resCh, errCh)
 	require.NoError(t, err)
 
 	errs := map[string]int{}

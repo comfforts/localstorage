@@ -35,7 +35,7 @@ func TestReadJSONArray(t *testing.T) {
 	resCh := make(chan models.JSONMapper)
 	errCh := make(chan error)
 
-	go jsonFiler.ReadJSONFile(ctx, cancel, resCh, errCh)
+	go jsonFiler.ReadJSONFile(ctx, resCh, errCh)
 
 	errs := map[string]int{}
 	resCount := 0
