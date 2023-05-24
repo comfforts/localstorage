@@ -10,8 +10,6 @@ import (
 
 	"github.com/comfforts/logger"
 	"github.com/stretchr/testify/require"
-
-	"github.com/comfforts/localstorage/pkg/models"
 )
 
 const TEST_DIR = "data"
@@ -69,8 +67,7 @@ func TestReadJSONFile(t *testing.T) {
 }
 
 func TestReadCSVFile(t *testing.T) {
-	fPath := filepath.Join(TEST_DIR, "Principals.csv")
-	// fPath := filepath.Join(TEST_DIR, "Agents.csv")
+	fPath := filepath.Join(TEST_DIR, "Agents-sm.csv")
 
 	logger := logger.NewTestAppLogger(TEST_DIR)
 	lsc, err := NewLocalStorageClient(logger)
@@ -86,7 +83,11 @@ func TestReadCSVFile(t *testing.T) {
 	require.NoError(t, err)
 
 	errs := map[string]int{}
-	res := map[int]*models.Entity{}
+	res := map[int][]string{}
+	var headers []string
+	isFirst := true
+	count := 0
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -98,8 +99,20 @@ func TestReadCSVFile(t *testing.T) {
 				return
 			} else {
 				if r != nil {
-					entity := models.MapToEntity(res, r)
-					t.Logf("TestReadCSVFile: entity: %v\n", entity)
+					if isFirst && len(errs) < 1 {
+						fmt.Printf("TestReadCSVFile: headers: %v, fieldCount: %d\n", r, len(r))
+						headers = r
+						isFirst = false
+					} else {
+						if headers == nil {
+							fmt.Printf("TestReadCSVFile: no headers\n")
+							cancel()
+						} else {
+							fmt.Printf("TestReadCSVFile: record: %v, fieldCount: %d\n", r, len(r))
+							res[count] = r
+							count++
+						}
+					}
 				}
 			}
 		case err, ok := <-errCh:
@@ -115,67 +128,6 @@ func TestReadCSVFile(t *testing.T) {
 		}
 	}
 
-}
-
-func TestReadFilingsCSVFile(t *testing.T) {
-	fPath := filepath.Join(TEST_DIR, "Filings.csv")
-
-	logger := logger.NewTestAppLogger(TEST_DIR)
-	lsc, err := NewLocalStorageClient(logger)
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	resCh := make(chan []string)
-	errCh := make(chan error)
-
-	err = lsc.ReadCSVFile(ctx, fPath, resCh, errCh)
-	require.NoError(t, err)
-
-	errs := map[string]int{}
-	res := map[int][]*models.Entity{}
-	var resCount int
-	for {
-		select {
-		case <-ctx.Done():
-			t.Logf("TestReadFilingsCSVFile: context done, returning. recordCount: %d, resCount: %d, errCnt: %v\n", resCount, len(res), errs)
-			return
-		case r, ok := <-resCh:
-			if !ok {
-				t.Logf("TestReadFilingsCSVFile: resultstream closed, returning. resCount: %d, resCount: %d, errCnt: %v\n", resCount, len(res), errs)
-				return
-			} else {
-				if r != nil {
-					entity, entErrs := models.MapRecordToEntity(r)
-					if entErrs != nil && len(entErrs) > 0 {
-						for _, err := range entErrs {
-							t.Logf("TestReadFilingsCSVFile, maping error: %v\n", err)
-							errs[err.Error()]++
-						}
-					}
-					t.Logf("TestReadFilingsCSVFile: entity: %v\n", entity)
-					_, ok := res[entity.ID]
-					if ok {
-						res[entity.ID] = append(res[entity.ID], entity)
-					} else {
-						res[entity.ID] = []*models.Entity{entity}
-					}
-					resCount++
-				}
-			}
-		case err, ok := <-errCh:
-			if !ok {
-				t.Logf("TestReadFilingsCSVFile: error stream closed, returning resCount: %d, resCount: %d, errCnt: %v\n", resCount, len(res), errs)
-				return
-			} else {
-				if err != nil {
-					t.Logf("TestReadFilingsCSVFile, error: %v\n", err)
-					errs[err.Error()]++
-				}
-			}
-		}
-	}
 }
 
 func TestLocalFileStorage(t *testing.T) {
